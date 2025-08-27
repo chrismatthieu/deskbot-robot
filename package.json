@@ -7,11 +7,19 @@
     "start": "node index.js",
     "demo": "node index.js"
   },
-  "keywords": ["amcrest", "ptz", "onvif", "camera", "security"],
+  "keywords": [
+    "amcrest",
+    "ptz",
+    "onvif",
+    "camera",
+    "security"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "onvif": "^0.6.5"
+    "node-rtsp-stream": "^0.0.9",
+    "ollama": "^0.5.17",
+    "onvif": "^0.6.5",
+    "sharp": "^0.34.3"
   }
 }
-

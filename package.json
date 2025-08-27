@@ -1,0 +1,17 @@
+{
+  "name": "amcrest-ptz-demo",
+  "version": "1.0.0",
+  "description": "PTZ demo for Amcrest security camera using ONVIF",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "demo": "node index.js"
+  },
+  "keywords": ["amcrest", "ptz", "onvif", "camera", "security"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "onvif": "^0.6.5"
+  }
+}
+

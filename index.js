@@ -252,28 +252,35 @@ async function startVoiceRecording() {
   
   voiceRecordingActive = true;
   console.log('🎤 Starting voice recording... Speak your question now!');
+  console.log('🎤 Speak clearly into the camera microphone...');
   
   try {
-    // Try to capture audio from camera microphone using Amcrest API first
-    console.log('🎵 Attempting to capture audio from camera microphone...');
+    // Use camera microphone recording (which we know works well)
     const audioFile = await recordAudioFromCamera();
-    
     if (audioFile) {
       await processVoiceInput(null, audioFile);
     } else {
-      // Fallback to local microphone recording
-      console.log('🎤 Falling back to local microphone...');
-      await startLocalRecording();
+      console.log('❌ No audio recorded from camera microphone');
     }
-    
   } catch (error) {
-    console.log('🎤 Camera microphone capture failed, using local microphone...');
-    await startLocalRecording();
+    console.log('❌ Camera microphone recording failed:', error.message);
+  } finally {
+    // Always reset the flag when done
+    voiceRecordingActive = false;
+    console.log('🎤 Voice recording session ended');
   }
 }
 
 // Start local microphone recording
 function startLocalRecording() {
+  console.log('🎤 Starting local microphone recording...');
+  console.log('🎤 Recording config:', {
+    sampleRate: VOICE_CONFIG.sampleRate,
+    threshold: VOICE_CONFIG.threshold,
+    silence: VOICE_CONFIG.silenceTimeout,
+    duration: VOICE_CONFIG.recordingDuration
+  });
+  
   const recording = record.record({
     sampleRateHertz: VOICE_CONFIG.sampleRate,
     threshold: VOICE_CONFIG.threshold,
@@ -286,14 +293,19 @@ function startLocalRecording() {
   recording.stream()
     .on('data', (chunk) => {
       audioChunks.push(chunk);
+      console.log('🎤 Audio chunk received:', chunk.length, 'bytes');
     })
     .on('end', async () => {
       console.log('🎤 Local voice recording completed');
+      console.log('🎤 Total audio chunks:', audioChunks.length);
       voiceRecordingActive = false;
       
       if (audioChunks.length > 0) {
         const audioBuffer = Buffer.concat(audioChunks);
+        console.log('🎤 Total audio buffer size:', audioBuffer.length, 'bytes');
         await processVoiceInput(audioBuffer);
+      } else {
+        console.log('⚠️  No audio data recorded');
       }
     })
     .on('error', (error) => {
@@ -353,23 +365,28 @@ async function convertSpeechToText(audioFile) {
       console.log('      📁 Input file size:', fs.existsSync(audioFile) ? fs.statSync(audioFile).size : 'N/A', 'bytes');
       
       try {
-        // First, convert the AAC audio to WAV format for better compatibility
-        const wavFile = audioFile.replace('.g711a', '.wav');
-        console.log('      🔄 Converting to WAV:', wavFile);
-    
-            // Use ffmpeg to convert AAC to WAV
-        const { spawn } = require('child_process');
-        console.log('      🔧 FFmpeg command:', 'ffmpeg', '-f', 'aac', '-i', audioFile, '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1', '-y', wavFile);
+        // Check if the input file is already WAV format
+        const isWavFile = audioFile.toLowerCase().endsWith('.wav');
+        let wavFile = audioFile;
         
-        const ffmpeg = spawn('ffmpeg', [
-          '-f', 'aac',  // Force AAC format
-          '-i', audioFile,
-          '-acodec', 'pcm_s16le',
-          '-ar', '16000',
-          '-ac', '1',
-          '-y', // Overwrite
-          wavFile
-        ]);
+        if (!isWavFile) {
+          // Convert AAC to WAV format for better compatibility
+          wavFile = audioFile.replace('.g711a', '.wav');
+          console.log('      🔄 Converting AAC to WAV:', wavFile);
+      
+          // Use ffmpeg to convert AAC to WAV
+          const { spawn } = require('child_process');
+          console.log('      🔧 FFmpeg command:', 'ffmpeg', '-f', 'aac', '-i', audioFile, '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1', '-y', wavFile);
+          
+          const ffmpeg = spawn('ffmpeg', [
+            '-f', 'aac',  // Force AAC format
+            '-i', audioFile,
+            '-acodec', 'pcm_s16le',
+            '-ar', '16000',
+            '-ac', '1',
+            '-y', // Overwrite
+            wavFile
+          ]);
         
         let stderr = '';
         let stdout = '';
@@ -403,8 +420,11 @@ async function convertSpeechToText(audioFile) {
         reject(error);
       });
     });
+        } else {
+          console.log('      ✅ Input file is already WAV format, no conversion needed');
+        }
     
-            // Try to use whisper-node for speech recognition
+        // Try to use whisper-node for speech recognition
         try {
           // Capture working directory BEFORE loading whisper-node (which changes it)
           const originalCwd = process.cwd();
@@ -426,11 +446,11 @@ async function convertSpeechToText(audioFile) {
                 // Add timeout to prevent hanging
           const whisperPromise = whisper(absoluteWavPath, {
             language: 'en',
-            modelName: 'tiny'
+            modelName: 'tiny' // Use the tiny model that we know works
           });
       
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Whisper timeout after 30 seconds')), 30000);
+        setTimeout(() => reject(new Error('Whisper timeout after 10 seconds')), 10000);
       });
       
       const result = await Promise.race([whisperPromise, timeoutPromise]);
@@ -473,7 +493,7 @@ async function convertSpeechToText(audioFile) {
         
         // Use ffmpeg to analyze audio characteristics
         const analyze = spawn('ffmpeg', [
-          '-i', absoluteWavPath,
+          '-i', wavFile,
           '-af', 'volumedetect',
           '-f', 'null',
           '-'
@@ -496,8 +516,8 @@ async function convertSpeechToText(audioFile) {
         });
         
         // Clean up the temporary WAV file
-        if (fs.existsSync(absoluteWavPath)) {
-          fs.unlinkSync(absoluteWavPath);
+        if (fs.existsSync(wavFile)) {
+          fs.unlinkSync(wavFile);
         }
         
         // Check if there's significant audio content

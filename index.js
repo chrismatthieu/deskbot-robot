@@ -161,73 +161,11 @@ async function analyzeImage(imageBase64) {
   }
 }
 
-// Start AI vision analysis
+// Start AI vision analysis (disabled - only for voice questions)
 async function startVisionAnalysis(rtspUrl) {
-  if (visionAnalysisActive) {
-    console.log('⚠️  Vision analysis already active');
-    return;
-  }
-  
-  visionAnalysisActive = true;
-  console.log('👁️  Starting AI Vision Analysis...');
-  console.log(`📊 Analysis interval: ${AI_CONFIG.analysisInterval}ms`);
-  
-  const analysisLoop = async () => {
-    if (!visionAnalysisActive) return;
-    
-    // Prevent overlapping AI requests
-    if (aiAnalysisInProgress) {
-      console.log('⏳ AI analysis in progress, skipping this cycle...');
-      setTimeout(analysisLoop, 2000);
-      return;
-    }
-    
-    try {
-      const now = Date.now();
-      if (now - lastAnalysisTime < AI_CONFIG.analysisInterval) {
-        setTimeout(analysisLoop, 1000);
-        return;
-      }
-      
-      lastAnalysisTime = now;
-      aiAnalysisInProgress = true;
-      console.log('\n📸 Capturing frame for analysis...');
-      
-      // Capture frame from RTSP stream
-      const imageBase64 = await captureFrame(rtspUrl);
-      
-      if (imageBase64) {
-        // Analyze with AI and wait for response
-        const analysis = await analyzeImage(imageBase64);
-        
-        if (analysis) {
-          console.log('🤖 AI Analysis Result:');
-          console.log(`   ${analysis}`);
-          
-          // Announce the result (you could add text-to-speech here)
-          announceVisionResult(analysis);
-        }
-        
-        // Wait for the full analysis interval before next capture
-        console.log(`⏱️  Waiting ${AI_CONFIG.analysisInterval}ms before next analysis...`);
-        aiAnalysisInProgress = false;
-        setTimeout(analysisLoop, AI_CONFIG.analysisInterval);
-      } else {
-        // If capture failed, retry sooner
-        console.log('🔄 Frame capture failed, retrying in 2 seconds...');
-        aiAnalysisInProgress = false;
-        setTimeout(analysisLoop, 2000);
-      }
-      
-    } catch (error) {
-      console.error('❌ Vision analysis error:', error.message);
-      // On error, retry sooner
-      aiAnalysisInProgress = false;
-      setTimeout(analysisLoop, 2000);
-    }
-  };
-  
-  analysisLoop();
+  console.log('👁️  AI Vision Analysis ready (only for voice questions)...');
+  console.log('📊 No continuous analysis - only responds to voice questions');
+  console.log('🎤 Press "V" to ask a question and get AI response with gestures!');
 }
 
 // Announce vision results (no automatic gestures)
@@ -926,7 +864,7 @@ async function playAudioThroughCamera(audioFile) {
   });
 }
 
-// Handle user question with AI vision
+// Handle user question with AI vision (optimized for speed)
 async function handleUserQuestion(question) {
   try {
     console.log('🤖 Processing question with AI vision...');
@@ -936,13 +874,13 @@ async function handleUserQuestion(question) {
     const imageBase64 = await captureFrame(rtspUrl);
     
     if (imageBase64) {
-      // Send question and image to AI
+      // Send question and image to AI with optimized prompt
       const response = await ollama.chat({
         model: AI_CONFIG.model,
         messages: [
           {
             role: 'system',
-            content: 'You are a helpful AI assistant that answers questions. For questions about what you see in the image, use the image. For general knowledge questions, use your knowledge. Always respond with "YES" if the answer is affirmative, "NO" if negative, or provide a brief description. Be concise and direct.'
+            content: 'You are a camera assistant that answers yes/no questions about what you see. Respond ONLY with "YES" or "NO" based on the image. Be direct and concise.'
           },
           {
             role: 'user',
@@ -953,19 +891,19 @@ async function handleUserQuestion(question) {
         stream: false
       });
       
-      const answer = response.message.content;
+      const answer = response.message.content.trim();
       console.log('🤖 AI Answer:', answer);
       
-      // Determine gesture based on answer
+      // Determine gesture based on answer (case-insensitive)
       const answerLower = answer.toLowerCase();
-      if (answerLower.includes('yes') || answerLower.includes('affirmative') || answerLower.includes('true')) {
+      if (answerLower === 'yes' || answerLower.includes('yes')) {
         console.log('✅ Answer is YES - Camera will nod in response');
         gestureInProgress = true;
         gestureYes(() => {
           console.log('✅ Camera nodded "YES" to your question');
           gestureInProgress = false;
         });
-      } else if (answerLower.includes('no') || answerLower.includes('negative') || answerLower.includes('false')) {
+      } else if (answerLower === 'no' || answerLower.includes('no')) {
         console.log('❌ Answer is NO - Camera will shake in response');
         gestureInProgress = true;
         gestureNo(() => {
@@ -986,7 +924,7 @@ async function handleUserQuestion(question) {
 // Start voice interaction system
 function startVoiceInteraction() {
   console.log('\n🎤 Voice Interaction System Ready!');
-  console.log('🤖 Camera is observing and waiting for your questions...');
+  console.log('🤖 Camera is ready to answer yes/no questions with gestures...');
   console.log('💡 Press "V" for voice question, "T" for text question, "M" for mic test, "Q" to quit');
   
   // Set up keyboard listener

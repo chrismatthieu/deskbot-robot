@@ -31,6 +31,17 @@ const VOICE_CONFIG = {
   recordingDuration: 5000 // Maximum recording duration in ms
 };
 
+// Wake word detection configuration
+const WAKE_WORD_CONFIG = {
+  wakePhrase: 'jarvis',
+  sampleRate: 16000,
+  channels: 1,
+  threshold: 0.05, // Lower threshold for wake word detection
+  silenceTimeout: 1000, // Shorter silence timeout for wake detection
+  recordingDuration: 3000, // Shorter recording for wake word
+  enabled: true // Enable/disable wake word detection
+};
+
 let rtspStream = null;
 let visionAnalysisActive = false;
 let lastAnalysisTime = 0;
@@ -925,7 +936,7 @@ async function handleUserQuestion(question) {
 function startVoiceInteraction() {
   console.log('\n🎤 Voice Interaction System Ready!');
   console.log('🤖 Camera is ready to answer yes/no questions with gestures...');
-  console.log('💡 Press "V" for voice question, "T" for text question, "M" for mic test, "Q" to quit');
+  console.log('💡 Press "V" for voice question, "T" for text question, "M" for mic test, "W" for wake word mode, "Q" to quit');
   
   // Set up keyboard listener
   process.stdin.setRawMode(true);
@@ -967,7 +978,11 @@ function startVoiceInteraction() {
     } else if (key === 'm' || key === 'M') {
       console.log('\n🎤 Starting microphone and speaker test...');
       await testMicrophoneAndSpeaker();
-      console.log('\n💡 Press "V" for voice, "T" for text, "M" for mic test, "Q" to quit');
+      console.log('\n💡 Press "V" for voice, "T" for text, "M" for mic test, "W" for wake word mode, "Q" to quit');
+    } else if (key === 'w' || key === 'W') {
+      console.log('\n👂 Starting wake word detection mode...');
+      console.log(`🎯 Say "${WAKE_WORD_CONFIG.wakePhrase}" to activate the camera!`);
+      startWakeWordMode();
     } else if (key === 'q' || key === 'Q') {
       console.log('\n👋 Quitting...');
       process.stdin.setRawMode(false);
@@ -976,6 +991,76 @@ function startVoiceInteraction() {
       process.exit(0);
     }
   });
+}
+
+// Wake word mode - continuously listen for wake word
+async function startWakeWordMode() {
+  console.log('👂 Wake word mode activated!');
+  console.log(`🎯 Continuously listening for: "${WAKE_WORD_CONFIG.wakePhrase}"`);
+  console.log('💡 Press any key to exit wake word mode');
+  
+  // Start continuous wake word detection
+  await monitorForWakeWord();
+}
+
+// Monitor for wake word continuously
+async function monitorForWakeWord() {
+  let wakeWordActive = true;
+  
+  while (wakeWordActive) {
+    try {
+      console.log('👂 Listening for wake word...');
+      
+      // Record audio and check for wake word
+      const audioFile = await recordAudioFromCamera();
+      
+      if (audioFile) {
+        // Check if wake word is present
+        const transcribedText = await convertSpeechToText(audioFile);
+        
+        if (transcribedText && transcribedText !== 'No speech detected') {
+          const textLower = transcribedText.toLowerCase().trim();
+          const wakePhraseLower = WAKE_WORD_CONFIG.wakePhrase.toLowerCase();
+          
+          console.log('🔍 Transcribed:', transcribedText);
+          
+          // Check for wake word variations (e.g., "jarvis", "jar vis", "jar", "vis")
+          const wakeWordDetected = textLower.includes(wakePhraseLower) || 
+                                  textLower.includes('jar vis') ||
+                                  (textLower.includes('jar') && textLower.includes('vis'));
+          
+          if (wakeWordDetected) {
+            console.log('🎯 Wake word detected! Processing question...');
+            
+            // Extract the question from the original audio (remove wake word)
+            const questionStart = textLower.indexOf(wakePhraseLower) + wakePhraseLower.length;
+            const questionText = transcribedText.substring(questionStart).trim();
+            
+            if (questionText && questionText !== '[ BLANK _ AUDIO ]') {
+              console.log('🎤 Extracted question:', questionText);
+              await handleUserQuestion(questionText);
+            } else {
+              console.log('❌ No question detected after wake word');
+            }
+            
+            console.log('👂 Resuming wake word detection...');
+          }
+        }
+        
+        // Clean up audio file
+        if (fs.existsSync(audioFile)) {
+          fs.unlinkSync(audioFile);
+        }
+      }
+      
+      // Small delay before next check
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+    } catch (error) {
+      console.error('❌ Wake word monitoring error:', error.message);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+    }
+  }
 }
 
 // Stop AI vision analysis

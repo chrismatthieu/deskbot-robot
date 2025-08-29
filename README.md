@@ -15,8 +15,26 @@ A Node.js script that demonstrates PTZ (Pan, Tilt, Zoom) control of an Amcrest s
 - Node.js (version 14 or higher)
 - An Amcrest security camera with ONVIF support
 - Camera connected to your network with known IP address
-- **Ollama** installed and running locally
-- **Llama 3.2 Vision model** installed in Ollama
+- **Ollama** installed and running locally (for local AI)
+- **Llama 3.2 Vision model** installed in Ollama (for local AI)
+- **OpenAI API key** (optional, for ChatGPT integration)
+
+## Environment Variables
+
+The application uses environment variables for configuration. Copy `.env.example` to `.env` and configure:
+
+### Required Variables:
+- `CAMERA_HOSTNAME` - Your camera's IP address
+- `CAMERA_USERNAME` - Camera username (usually "admin")
+- `CAMERA_PASSWORD` - Camera password
+- `CAMERA_PORT` - ONVIF port (usually 80)
+
+### Optional Variables:
+- `AI_PROVIDER` - "ollama" or "chatgpt" (default: "ollama")
+- `OPENAI_API_KEY` - Required if using ChatGPT
+- `CAMERA_AUDIO_CHANNEL` - Audio channel (default: 1)
+- `CAMERA_AUDIO_VOLUME` - Speaker volume 0-100 (default: 80)
+- `WAKE_WORD_PHRASE` - Wake word to trigger voice interaction (default: "jarvis")
 
 ## Setup
 
@@ -25,7 +43,16 @@ A Node.js script that demonstrates PTZ (Pan, Tilt, Zoom) control of an Amcrest s
    npm install
    ```
 
-2. **Install Ollama:**
+2. **Configure environment variables:**
+   ```bash
+   # Copy the example configuration file
+   cp .env.example .env
+   
+   # Edit with your camera settings
+   nano .env
+   ```
+
+3. **Install Ollama (for local AI):**
    ```bash
    # macOS/Linux
    curl -fsSL https://ollama.ai/install.sh | sh
@@ -34,20 +61,33 @@ A Node.js script that demonstrates PTZ (Pan, Tilt, Zoom) control of an Amcrest s
    ollama serve
    ```
 
-3. **Install Llama 3.2 Vision model:**
+4. **Install Llama 3.2 Vision model:**
    ```bash
    ollama pull llama3.2-vision
    ```
 
-4. **Configure camera settings:**
-   Edit `index.js` and update the camera configuration:
-   ```javascript
-   const cameraConfig = {
-     hostname: '192.168.0.42',  // Your camera's IP address
-     username: 'admin',         // Your camera's username
-     password: 'V1ctor1a',      // Your camera's password
-     port: 80                   // ONVIF port (usually 80 or 8080)
-   };
+4. **Configure environment variables:**
+   ```bash
+   # Copy the example configuration file
+   cp .env.example .env
+   
+   # Edit the .env file with your camera settings
+   nano .env
+   ```
+   
+   Update the following values in your `.env` file:
+   ```env
+   # Camera Configuration (Required)
+   CAMERA_HOSTNAME=192.168.0.42  # Your camera's IP address
+   CAMERA_USERNAME=admin         # Your camera's username
+   CAMERA_PASSWORD=your_password # Your camera's password
+   CAMERA_PORT=80               # ONVIF port (usually 80 or 8080)
+   
+   # AI Configuration
+   AI_PROVIDER=ollama           # Use "ollama" or "chatgpt"
+   
+   # ChatGPT (Required if using ChatGPT)
+   OPENAI_API_KEY=your_api_key  # Your OpenAI API key
    ```
 
 ## Usage
@@ -61,6 +101,14 @@ Or run directly:
 ```bash
 node index.js
 ```
+
+## Security Notes
+
+- **Never commit your `.env` file** - it contains sensitive information
+- **Use strong passwords** for your camera
+- **Keep your API keys secure** - especially OpenAI API keys
+- **Consider using a dedicated network** for your camera
+- **Regularly update** your camera firmware and dependencies
 
 ## What the Demo Does
 

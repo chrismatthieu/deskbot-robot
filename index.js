@@ -10,10 +10,10 @@ const record = require('node-record-lpcm16');
 
 // Camera configuration
 const cameraConfig = {
-  hostname: '192.168.0.42',
-  username: 'admin',
-  password: 'V1ctor1a',
-  port: 80
+  hostname: process.env.CAMERA_HOSTNAME || '192.168.0.42',
+  username: process.env.CAMERA_USERNAME || 'admin',
+  password: process.env.CAMERA_PASSWORD || 'admin123',
+  port: parseInt(process.env.CAMERA_PORT) || 80
 };
 
 // AI Provider Configuration

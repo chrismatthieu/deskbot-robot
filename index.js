@@ -1,5 +1,7 @@
+require('dotenv').config();
 const { Cam } = require('onvif');
 const ollama = require('ollama').default;
+const OpenAI = require('openai');
 const sharp = require('sharp');
 const fs = require('fs');
 const path = require('path');
@@ -13,6 +15,9 @@ const cameraConfig = {
   password: 'V1ctor1a',
   port: 80
 };
+
+// AI Provider Configuration
+const AI_PROVIDER = process.env.AI_PROVIDER || 'ollama'; // 'ollama' or 'chatgpt'
 
 // AI Vision configuration
 const AI_CONFIG = {
@@ -53,30 +58,59 @@ let currentAudioStream = null;
 console.log('🔍 Connecting to Amcrest camera...');
 console.log(`📍 IP: ${cameraConfig.hostname}`);
 console.log(`👤 Username: ${cameraConfig.username}`);
-console.log('🤖 Initializing AI Vision with Ollama...');
+console.log(`🤖 AI Provider: ${AI_PROVIDER.toUpperCase()}`);
 
-// Initialize Ollama connection
-async function initializeOllama() {
-  try {
-    console.log('🧠 Checking Ollama connection...');
-    const models = await ollama.list();
-    console.log('📋 Available models:', models.models.map(m => m.name));
-    
-    // Check if qwen2.5vl:3b is available
-    const hasQwenModel = models.models.some(m => m.name.includes('qwen2.5vl:3b'));
-    if (!hasQwenModel) {
-      console.log('⚠️  qwen2.5vl:3b model not found. Please install it with: ollama pull qwen2.5vl:3b');
-      console.log('🔄 Falling back to llama3.2-vision model...');
-      AI_CONFIG.model = 'llama3.2-vision';
-    } else {
-      console.log('✅ qwen2.5vl:3b model found!');
+// Initialize AI clients
+let openai = null;
+if (AI_PROVIDER === 'chatgpt') {
+  openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY
+  });
+  console.log('🤖 Initializing AI Vision with ChatGPT...');
+} else {
+  console.log('🤖 Initializing AI Vision with Ollama...');
+}
+
+// Initialize AI connection
+async function initializeAI() {
+  if (AI_PROVIDER === 'chatgpt') {
+    try {
+      console.log('🧠 Checking ChatGPT connection...');
+      // Test the connection with a simple request
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: 'Hello' }],
+        max_tokens: 5
+      });
+      console.log('✅ ChatGPT connection successful!');
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to connect to ChatGPT:', error.message);
+      console.log('💡 Make sure your OpenAI API key is valid');
+      return false;
     }
-    
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to connect to Ollama:', error.message);
-    console.log('💡 Make sure Ollama is running: ollama serve');
-    return false;
+  } else {
+    try {
+      console.log('🧠 Checking Ollama connection...');
+      const models = await ollama.list();
+      console.log('📋 Available models:', models.models.map(m => m.name));
+      
+      // Check if qwen2.5vl:3b is available
+      const hasQwenModel = models.models.some(m => m.name.includes('qwen2.5vl:3b'));
+      if (!hasQwenModel) {
+        console.log('⚠️  qwen2.5vl:3b model not found. Please install it with: ollama pull qwen2.5vl:3b');
+        console.log('🔄 Falling back to llama3.2-vision model...');
+        AI_CONFIG.model = 'llama3.2-vision';
+      } else {
+        console.log('✅ qwen2.5vl:3b model found!');
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('❌ Failed to connect to Ollama:', error.message);
+      console.log('💡 Make sure Ollama is running: ollama serve');
+      return false;
+    }
   }
 }
 
@@ -144,28 +178,87 @@ async function captureFrame(rtspUrl) {
   });
 }
 
-// Analyze image with Ollama Vision model
+// Unified AI chat function that works with both Ollama and ChatGPT
+async function aiChat(messages) {
+  try {
+    if (AI_PROVIDER === 'chatgpt') {
+      console.log('🤖 Using ChatGPT for AI analysis...');
+      
+      // Convert messages for ChatGPT format
+      const chatGptMessages = messages.map(msg => {
+        if (msg.images && msg.images.length > 0) {
+          // Convert base64 to proper format for ChatGPT
+          return {
+            role: msg.role,
+            content: [
+              {
+                type: 'text',
+                text: msg.content
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:image/jpeg;base64,${msg.images[0]}`
+                }
+              }
+            ]
+          };
+        } else {
+          return {
+            role: msg.role,
+            content: msg.content
+          };
+        }
+      });
+      
+      console.log('📤 Sending to ChatGPT:', {
+        model: 'gpt-4o',
+        messageCount: chatGptMessages.length,
+        hasImage: chatGptMessages.some(msg => msg.content && Array.isArray(msg.content) && msg.content.some(c => c.type === 'image_url'))
+      });
+      
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o', // Use vision-capable model
+        messages: chatGptMessages,
+        max_tokens: 50,
+        temperature: 0.1
+      });
+      
+      console.log('📥 ChatGPT response:', response.choices[0].message.content);
+      return response.choices[0].message.content;
+    } else {
+      console.log('🤖 Using Ollama for AI analysis...');
+      const response = await ollama.chat({
+        model: AI_CONFIG.model,
+        messages: messages,
+        stream: false
+      });
+      return response.message.content;
+    }
+  } catch (error) {
+    console.error('❌ AI chat failed:', error.message);
+    return null;
+  }
+}
+
+// Analyze image with AI Vision model
 async function analyzeImage(imageBase64) {
   try {
     console.log('🔍 Analyzing image with AI...');
     
-    const response = await ollama.chat({
-      model: AI_CONFIG.model,
-      messages: [
-        {
-          role: 'system',
-          content: 'You are a helpful AI assistant that analyzes security camera footage. Describe what you see in a clear, concise manner using no more than 6 words. Focus on people, objects, activities, and any potential security concerns. Keep descriptions brief but informative.'
-        },
-        {
-          role: 'user',
-          content: 'What do you see in this security camera image?',
-          images: [imageBase64]
-        }
-      ],
-      stream: false
-    });
+    const messages = [
+      {
+        role: 'system',
+        content: 'You are a helpful AI assistant that analyzes security camera footage. Describe what you see in a clear, concise manner using no more than 6 words. Focus on people, objects, activities, and any potential security concerns. Keep descriptions brief but informative.'
+      },
+      {
+        role: 'user',
+        content: 'What do you see in this security camera image?',
+        images: [imageBase64]
+      }
+    ];
     
-    return response.message.content;
+    return await aiChat(messages);
   } catch (error) {
     console.error('❌ AI analysis failed:', error.message);
     return null;
@@ -886,47 +979,47 @@ async function handleUserQuestion(question) {
     
     if (imageBase64) {
       // Send question and image to AI with optimized prompt
-      const response = await ollama.chat({
-        model: AI_CONFIG.model,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a camera assistant that answers yes/no questions about what you see. Respond ONLY with "YES" or "NO" based on the image. Be direct and concise.'
-          },
-          {
-            role: 'user',
-            content: question,
-            images: [imageBase64]
-          }
-        ],
-        stream: false
-      });
+      const messages = [
+        {
+          role: 'system',
+          content: AI_PROVIDER === 'chatgpt' 
+            ? 'You are a camera assistant that answers yes/no questions about what you see. You MUST respond with ONLY "YES" or "NO" - no other text, no explanations, no punctuation. Just "YES" or "NO".'
+            : 'You are a camera assistant that answers yes/no questions about what you see. Respond ONLY with "YES" or "NO" based on the image. Be direct and concise.'
+        },
+        {
+          role: 'user',
+          content: question,
+          images: [imageBase64]
+        }
+      ];
       
-      const answer = response.message.content.trim();
-      console.log('🤖 AI Answer:', answer);
-      
-      // Determine gesture based on answer (case-insensitive)
-      const answerLower = answer.toLowerCase();
-      if (answerLower === 'yes' || answerLower.includes('yes')) {
-        console.log('✅ Answer is YES - Camera will nod in response');
-        gestureInProgress = true;
-        gestureYes(() => {
-          console.log('✅ Camera nodded "YES" to your question');
-          gestureInProgress = false;
-        });
-      } else if (answerLower === 'no' || answerLower.includes('no')) {
-        console.log('❌ Answer is NO - Camera will shake in response');
-        gestureInProgress = true;
-        gestureNo(() => {
-          console.log('✅ Camera shook "NO" to your question');
-          gestureInProgress = false;
-        });
-      } else {
-        console.log('🤔 Ambiguous answer - Camera will not gesture');
-        console.log('💡 Try asking a yes/no question for a gesture response');
+      const answer = await aiChat(messages);
+      if (answer) {
+        const answerTrimmed = answer.trim();
+        console.log('🤖 AI Answer:', answerTrimmed);
+        
+        // Determine gesture based on answer (case-insensitive)
+        const answerLower = answerTrimmed.toLowerCase();
+        if (answerLower === 'yes' || answerLower.includes('yes')) {
+          console.log('✅ Answer is YES - Camera will nod in response');
+          gestureInProgress = true;
+          gestureYes(() => {
+            console.log('✅ Camera nodded "YES" to your question');
+            gestureInProgress = false;
+          });
+        } else if (answerLower === 'no' || answerLower.includes('no')) {
+          console.log('❌ Answer is NO - Camera will shake in response');
+          gestureInProgress = true;
+          gestureNo(() => {
+            console.log('✅ Camera shook "NO" to your question');
+            gestureInProgress = false;
+          });
+        } else {
+          console.log('🤔 Ambiguous answer - Camera will not gesture');
+          console.log('💡 Try asking a yes/no question for a gesture response');
+        }
       }
     }
-    
   } catch (error) {
     console.error('❌ Question processing error:', error.message);
   }
@@ -1024,9 +1117,10 @@ async function monitorForWakeWord() {
           
           console.log('🔍 Transcribed:', transcribedText);
           
-          // Check for wake word variations (e.g., "jarvis", "jar vis", "jar", "vis")
+          // Check for wake word variations (e.g., "jarvis", "jar vis", "journalist", "jar", "vis")
           const wakeWordDetected = textLower.includes(wakePhraseLower) || 
                                   textLower.includes('jar vis') ||
+                                  textLower.includes('journalist') ||
                                   (textLower.includes('jar') && textLower.includes('vis'));
           
           if (wakeWordDetected) {
@@ -1085,8 +1179,8 @@ const cam = new Cam(cameraConfig, async function(err) {
   console.log('✅ Successfully connected to camera!');
   
   // Initialize Ollama
-  const ollamaReady = await initializeOllama();
-  if (!ollamaReady) {
+  const aiReady = await initializeAI();
+  if (!aiReady) {
     console.log('⚠️  Continuing without AI vision capabilities...');
   }
   
@@ -1116,7 +1210,7 @@ const cam = new Cam(cameraConfig, async function(err) {
         console.log('🔐 Authenticated RTSP URL:', authenticatedRtspUrl);
         
         // Start AI vision analysis if Ollama is ready
-        if (ollamaReady) {
+        if (aiReady) {
           console.log('\n🚀 Starting AI Vision Analysis...');
           startVisionAnalysis(authenticatedRtspUrl);
         }

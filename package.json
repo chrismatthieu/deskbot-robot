@@ -17,10 +17,12 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "dotenv": "^17.2.1",
     "node-record-lpcm16": "^1.0.1",
     "node-rtsp-stream": "^0.0.9",
     "ollama": "^0.5.17",
     "onvif": "^0.6.5",
+    "openai": "^5.16.0",
     "sharp": "^0.34.3",
     "whisper-node": "^1.1.1"
   }

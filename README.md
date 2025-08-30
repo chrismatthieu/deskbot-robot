@@ -110,6 +110,10 @@ node index.js
 - **Consider using a dedicated network** for your camera
 - **Regularly update** your camera firmware and dependencies
 
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
 ## What the Demo Does
 
 The script will:

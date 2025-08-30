@@ -1,7 +1,7 @@
 {
-  "name": "amcrest-ptz-demo",
+  "name": "Desktop Robot",
   "version": "1.0.0",
-  "description": "PTZ demo for Amcrest security camera using ONVIF",
+  "description": "AI Powered Desktop Robot PTZ demo for Amcrest security camera using ONVIF",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

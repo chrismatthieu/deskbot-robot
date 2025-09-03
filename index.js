@@ -1396,7 +1396,7 @@ function gestureYes(callback) {
     
     console.log(`   Nod ${nodCount + 1}/${maxNods}: Tilting up...`);
     // Nod up - larger movement and longer duration
-    cam.continuousMove({ x: 0.0, y: 0.3, zoom: 0.0 }, (err) => {
+    cam.continuousMove({ x: 0.0, y: 0.2, zoom: 0.0 }, (err) => {
       if (err) {
         console.error('❌ Failed to nod up:', err.message);
         return;
@@ -1405,7 +1405,7 @@ function gestureYes(callback) {
       setTimeout(() => {
         console.log(`   Nod ${nodCount + 1}/${maxNods}: Tilting down...`);
         // Nod down - larger movement and longer duration
-        cam.continuousMove({ x: 0.0, y: -0.3, zoom: 0.0 }, (err) => {
+        cam.continuousMove({ x: 0.0, y: -0.2, zoom: 0.0 }, (err) => {
           if (err) {
             console.error('❌ Failed to nod down:', err.message);
             return;
@@ -1451,7 +1451,7 @@ function gestureNo(callback) {
     
     console.log(`   Shake ${shakeCount + 1}/${maxShakes}: Panning left...`);
     // Shake left - larger movement and longer duration
-    cam.continuousMove({ x: -0.3, y: 0.0, zoom: 0.0 }, (err) => {
+    cam.continuousMove({ x: -0.2, y: 0.0, zoom: 0.0 }, (err) => {
       if (err) {
         console.error('❌ Failed to shake left:', err.message);
         return;
@@ -1460,7 +1460,7 @@ function gestureNo(callback) {
       setTimeout(() => {
         console.log(`   Shake ${shakeCount + 1}/${maxShakes}: Panning right...`);
         // Shake right - larger movement and longer duration
-        cam.continuousMove({ x: 0.3, y: 0.0, zoom: 0.0 }, (err) => {
+        cam.continuousMove({ x: 0.2, y: 0.0, zoom: 0.0 }, (err) => {
           if (err) {
             console.error('❌ Failed to shake right:', err.message);
             return;

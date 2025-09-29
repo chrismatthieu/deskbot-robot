@@ -1032,7 +1032,9 @@ function startVoiceInteraction() {
   console.log('💡 Press "V" for voice question, "T" for text question, "M" for mic test, "W" for wake word mode, "Q" to quit');
   
   // Set up keyboard listener
-  process.stdin.setRawMode(true);
+  if (process.stdin.setRawMode) {
+    process.stdin.setRawMode(true);
+  }
   process.stdin.resume();
   process.stdin.setEncoding('utf8');
   
@@ -1040,7 +1042,9 @@ function startVoiceInteraction() {
     // Handle Ctrl+C (ASCII 3)
     if (key === '\u0003') {
       console.log('\n🛑 Ctrl+C detected - stopping application...');
-      process.stdin.setRawMode(false);
+      if (process.stdin.setRawMode) {
+        process.stdin.setRawMode(false);
+      }
       process.stdin.pause();
       stopVisionAnalysis();
       cam.stop(() => {
@@ -1055,7 +1059,9 @@ function startVoiceInteraction() {
       startVoiceRecording();
     } else if (key === 't' || key === 'T') {
       console.log('\n📝 Text input mode - Type your question and press Enter:');
-      process.stdin.setRawMode(false);
+      if (process.stdin.setRawMode) {
+        process.stdin.setRawMode(false);
+      }
       process.stdin.setEncoding('utf8');
       
       process.stdin.once('data', async (question) => {
@@ -1064,7 +1070,9 @@ function startVoiceInteraction() {
         await handleUserQuestion(cleanQuestion);
         
         // Return to raw mode for keyboard shortcuts
-        process.stdin.setRawMode(true);
+        if (process.stdin.setRawMode) {
+          process.stdin.setRawMode(true);
+        }
         process.stdin.setEncoding('utf8');
         console.log('\n💡 Press "V" for voice, "T" for text, "M" for mic test, "Q" to quit');
       });
@@ -1078,7 +1086,9 @@ function startVoiceInteraction() {
       startWakeWordMode();
     } else if (key === 'q' || key === 'Q') {
       console.log('\n👋 Quitting...');
-      process.stdin.setRawMode(false);
+      if (process.stdin.setRawMode) {
+        process.stdin.setRawMode(false);
+      }
       process.stdin.pause();
       stopVisionAnalysis();
       process.exit(0);
